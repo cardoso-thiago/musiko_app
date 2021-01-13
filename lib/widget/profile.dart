@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:musiko_app/api/last.dart';
-import 'package:musiko_app/model/top_albums_model.dart' as tam;
 import 'package:musiko_app/model/user_model.dart' as um;
 import 'package:musiko_app/widget/login.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,8 +26,12 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  var currentSelectedValue;
+  var currentSelectedPeriodValue = "overall";
   var periods = ["overall", "12month", "6month", "3month", "1month", "7day"];
+  var currentSelectedTypeValue = "albums";
+  var types = ["albums", "artists"];
+  var currentSelectedGridSizeValue = 9;
+  var gridSizes = [9, 12, 15, 18];
 
   @override
   void initState() {
@@ -145,58 +148,118 @@ class _HomePageState extends State<HomePage> {
                     ],
                   );
                 }
-                return Center(
-                  child: CircularProgressIndicator(),
+                return SizedBox(
+                  height: MediaQuery.of(context).size.height,
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
                 );
               },
             ),
           ),
           Container(
             alignment: Alignment.center,
-            child: FutureBuilder<tam.TopAlbumsModel>(
-              future: getTopAlbums(currentSelectedValue),
+            child: FutureBuilder<List<String>>(
+              future: getTopList(currentSelectedTypeValue, currentSelectedPeriodValue),
               builder: (context, snapshot) {
                 if (snapshot.hasData) {
                   return Padding(
                     padding: const EdgeInsets.all(10.0),
                     child: Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                      DropdownButton<String>(
-                        hint: Text("Select"),
-                        value: currentSelectedValue,
-                        icon: Icon(Icons.arrow_drop_down),
-                        iconEnabledColor: Colors.black,
-                        iconSize: 24,
-                        elevation: 16,
-                        style: TextStyle(color: Colors.black),
-                        underline: Container(
-                          height: 2,
-                          color: Colors.black,
-                        ),
-                        onChanged: (String newValue) {
-                          setState(() {
-                            currentSelectedValue = newValue;
-                          });
-                        },
-                        items: periods.map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          DropdownButton<String>(
+                            hint: Text("albums"),
+                            value: currentSelectedTypeValue,
+                            icon: Icon(Icons.arrow_drop_down),
+                            iconEnabledColor: Colors.black,
+                            iconSize: 24,
+                            elevation: 16,
+                            style: TextStyle(color: Colors.black),
+                            underline: Container(
+                              height: 2,
+                              color: Colors.black,
+                            ),
+                            onChanged: (String newValue) {
+                              setState(() {
+                                currentSelectedTypeValue = newValue;
+                              });
+                            },
+                            items: types.map<DropdownMenuItem<String>>((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value),
+                              );
+                            }).toList(),
+                          ),
+                          DropdownButton<String>(
+                            hint: Text("overall"),
+                            value: currentSelectedPeriodValue,
+                            icon: Icon(Icons.arrow_drop_down),
+                            iconEnabledColor: Colors.black,
+                            iconSize: 24,
+                            elevation: 16,
+                            style: TextStyle(color: Colors.black),
+                            underline: Container(
+                              height: 2,
+                              color: Colors.black,
+                            ),
+                            onChanged: (String newValue) {
+                              setState(() {
+                                currentSelectedPeriodValue = newValue;
+                              });
+                            },
+                            items: periods.map<DropdownMenuItem<String>>((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value),
+                              );
+                            }).toList(),
+                          ),
+                          DropdownButton<int>(
+                            hint: Text("9"),
+                            value: currentSelectedGridSizeValue,
+                            icon: Icon(Icons.arrow_drop_down),
+                            iconEnabledColor: Colors.black,
+                            iconSize: 24,
+                            elevation: 16,
+                            style: TextStyle(color: Colors.black),
+                            underline: Container(
+                              height: 2,
+                              color: Colors.black,
+                            ),
+                            onChanged: (int newValue) {
+                              setState(() {
+                                currentSelectedGridSizeValue = newValue;
+                              });
+                            },
+                            items: gridSizes.map<DropdownMenuItem<int>>((int value) {
+                              return DropdownMenuItem<int>(
+                                value: value,
+                                child: Text(value.toString()),
+                              );
+                            }).toList(),
+                          ),
+                        ],
                       ),
                       GridView.builder(
                           scrollDirection: Axis.vertical,
                           shrinkWrap: true,
-                          itemCount: 9,
+                          itemCount: currentSelectedGridSizeValue,
+                          physics: const NeverScrollableScrollPhysics(),
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
                           itemBuilder: (BuildContext context, int index) {
-                            return Image.network(snapshot.data.topalbums.album[index].image.last.text);
+                            return Image.network(snapshot.data[index]);
                           }),
                     ]),
                   );
                 }
-                return Center(
-                  child: CircularProgressIndicator(),
+                return SizedBox(
+                  height: MediaQuery.of(context).size.height,
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
                 );
               },
             ),
@@ -212,9 +275,16 @@ class _HomePageState extends State<HomePage> {
     return LastFmApi.getUserInfo(user);
   }
 
-  Future<tam.TopAlbumsModel> getTopAlbums(String currentSelectedValue) async {
+  Future<List<String>> getTopList(String type, String period) async {
     var prefs = await SharedPreferences.getInstance();
     var user = prefs.get("user");
-    return LastFmApi.getTopAlbums(user, currentSelectedValue);
+    if (type == "albums") {
+      var albums = await LastFmApi.getTopAlbums(user, period);
+      return albums.topalbums.album.map((item) => item.image.last.text).toList();
+    }
+    var artists = await LastFmApi.getTopArtists(user, period);
+    return artists.topartists.artist
+        .map((item) => "https://tse2.mm.bing.net/th?q=${item.name} Band&w=500&h=500&c=7&rs=1&p=0&dpr=3&pid=1.7&mkt=en-IN&adlt=on")
+        .toList();
   }
 }
